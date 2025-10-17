@@ -1,0 +1,13 @@
+# Docker Ignored Files
+# Ignore volumes containing Grafana/Prometheus data
+prometheus_data/
+grafana_data/
+
+# Python Ignored Files
+__pycache__/
+*.pyc
+
+# Local Environment Files
+.vscode/
+.idea/
+.DS_Store

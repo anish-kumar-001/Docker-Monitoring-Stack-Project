@@ -1,0 +1,71 @@
+version: '3.8'
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+
+services:
+  # 1. Frontend Web Server (Nginx) - Port 80
+  frontend:
+    build: 
+      context: ./app/frontend
+    container_name: frontend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+  # 2. Backend Application (Python Flask) - Port 5000 (App)
+  backend:
+    build: 
+      context: ./app/backend
+    container_name: backend
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    # Port 8000 is exposed internally for Prometheus
+
+  # 3. Node Exporter (Host OS Metrics) - Port 9100
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    network_mode: host 
+    pid: host 
+    restart: unless-stopped
+    volumes:
+      - '/:/host:ro,rslave' 
+      - /sys:/host/sys:ro
+      - /proc:/host/proc:ro
+
+  # 4. Prometheus (Data Collector) - Port 9090
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      # Mounts the corrected configuration file
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro 
+      - prometheus_data:/prometheus 
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    depends_on:
+      - node-exporter
+      # CRITICAL FIX: Explicitly maps the host network for reliable scraping
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # 5. Grafana (Visualization) - Port 3000
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana 
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=promgrafana
+    depends_on:
+      - prometheus
